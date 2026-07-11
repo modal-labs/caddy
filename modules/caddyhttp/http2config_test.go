@@ -3,6 +3,9 @@ package caddyhttp
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/caddyserver/caddy/v2"
 )
 
 func TestHTTP2ConfigValidate(t *testing.T) {
@@ -40,6 +43,29 @@ func TestHTTP2ConfigValidate(t *testing.T) {
 			cfg:     HTTP2Config{MaxReceiveBufferPerStream: -1},
 			wantErr: "max_receive_buffer_per_stream",
 		},
+		{
+			name: "ping and write timeouts are valid",
+			cfg: HTTP2Config{
+				SendPingTimeout:  caddy.Duration(30 * time.Second),
+				PingTimeout:      caddy.Duration(15 * time.Second),
+				WriteByteTimeout: caddy.Duration(30 * time.Second),
+			},
+		},
+		{
+			name:    "negative send ping timeout",
+			cfg:     HTTP2Config{SendPingTimeout: caddy.Duration(-time.Second)},
+			wantErr: "send_ping_timeout",
+		},
+		{
+			name:    "negative ping timeout",
+			cfg:     HTTP2Config{PingTimeout: caddy.Duration(-time.Second)},
+			wantErr: "ping_timeout",
+		},
+		{
+			name:    "negative write byte timeout",
+			cfg:     HTTP2Config{WriteByteTimeout: caddy.Duration(-time.Second)},
+			wantErr: "write_byte_timeout",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.cfg.validate()
@@ -61,11 +87,17 @@ func TestHTTP2ConfigStd(t *testing.T) {
 		MaxConcurrentStreams:          1024,
 		MaxReceiveBufferPerConnection: 64 << 20,
 		MaxReceiveBufferPerStream:     2 << 20,
+		SendPingTimeout:               caddy.Duration(30 * time.Second),
+		PingTimeout:                   caddy.Duration(15 * time.Second),
+		WriteByteTimeout:              caddy.Duration(30 * time.Second),
 	}
 	std := cfg.std()
 	if std.MaxConcurrentStreams != 1024 ||
 		std.MaxReceiveBufferPerConnection != 64<<20 ||
-		std.MaxReceiveBufferPerStream != 2<<20 {
+		std.MaxReceiveBufferPerStream != 2<<20 ||
+		std.SendPingTimeout != 30*time.Second ||
+		std.PingTimeout != 15*time.Second ||
+		std.WriteByteTimeout != 30*time.Second {
 		t.Fatalf("std conversion mismatch: %+v", std)
 	}
 }

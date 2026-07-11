@@ -256,6 +256,36 @@ func unmarshalCaddyfileServerOptions(d *caddyfile.Dispenser) (any, error) {
 					}
 					serverOpts.HTTP2.MaxReceiveBufferPerStream = int(size)
 
+				case "send_ping_timeout":
+					if !d.NextArg() {
+						return nil, d.ArgErr()
+					}
+					dur, err := caddy.ParseDuration(d.Val())
+					if err != nil {
+						return nil, d.Errf("parsing send_ping_timeout duration: %v", err)
+					}
+					serverOpts.HTTP2.SendPingTimeout = caddy.Duration(dur)
+
+				case "ping_timeout":
+					if !d.NextArg() {
+						return nil, d.ArgErr()
+					}
+					dur, err := caddy.ParseDuration(d.Val())
+					if err != nil {
+						return nil, d.Errf("parsing ping_timeout duration: %v", err)
+					}
+					serverOpts.HTTP2.PingTimeout = caddy.Duration(dur)
+
+				case "write_byte_timeout":
+					if !d.NextArg() {
+						return nil, d.ArgErr()
+					}
+					dur, err := caddy.ParseDuration(d.Val())
+					if err != nil {
+						return nil, d.Errf("parsing write_byte_timeout duration: %v", err)
+					}
+					serverOpts.HTTP2.WriteByteTimeout = caddy.Duration(dur)
+
 				default:
 					return nil, d.Errf("unrecognized http2 option '%s'", d.Val())
 				}

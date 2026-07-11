@@ -331,6 +331,24 @@ type HTTP2Config struct {
 	// bodies, in bytes. If zero, the default (currently 1 MiB)
 	// is used.
 	MaxReceiveBufferPerStream int `json:"max_receive_buffer_per_stream,omitempty"`
+
+	// SendPingTimeout is how long a connection may be idle
+	// (no frames received) before the server sends a PING
+	// frame to check that it is still alive. If zero, no
+	// health checks are performed.
+	SendPingTimeout caddy.Duration `json:"send_ping_timeout,omitempty"`
+
+	// PingTimeout is how long to wait for a PING response
+	// before closing the connection. If zero, the default
+	// (currently 15s) is used.
+	PingTimeout caddy.Duration `json:"ping_timeout,omitempty"`
+
+	// WriteByteTimeout is how long a connection may be unable
+	// to accept written data before it is closed. The timeout
+	// begins when data becomes available to write, and is
+	// extended whenever any bytes are written. If zero, writes
+	// do not time out.
+	WriteByteTimeout caddy.Duration `json:"write_byte_timeout,omitempty"`
 }
 
 // validate checks that configured values are within the ranges accepted
@@ -347,6 +365,15 @@ func (c *HTTP2Config) validate() error {
 	if c.MaxReceiveBufferPerStream < 0 || int64(c.MaxReceiveBufferPerStream) > math.MaxInt32 {
 		return fmt.Errorf("max_receive_buffer_per_stream must be in [0, %d], got %d", math.MaxInt32, c.MaxReceiveBufferPerStream)
 	}
+	if c.SendPingTimeout < 0 {
+		return fmt.Errorf("send_ping_timeout must not be negative, got %v", time.Duration(c.SendPingTimeout))
+	}
+	if c.PingTimeout < 0 {
+		return fmt.Errorf("ping_timeout must not be negative, got %v", time.Duration(c.PingTimeout))
+	}
+	if c.WriteByteTimeout < 0 {
+		return fmt.Errorf("write_byte_timeout must not be negative, got %v", time.Duration(c.WriteByteTimeout))
+	}
 	return nil
 }
 
@@ -356,6 +383,9 @@ func (c *HTTP2Config) std() *http.HTTP2Config {
 		MaxConcurrentStreams:          c.MaxConcurrentStreams,
 		MaxReceiveBufferPerConnection: c.MaxReceiveBufferPerConnection,
 		MaxReceiveBufferPerStream:     c.MaxReceiveBufferPerStream,
+		SendPingTimeout:               time.Duration(c.SendPingTimeout),
+		PingTimeout:                   time.Duration(c.PingTimeout),
+		WriteByteTimeout:              time.Duration(c.WriteByteTimeout),
 	}
 }
 
