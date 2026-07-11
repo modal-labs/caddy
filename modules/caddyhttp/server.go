@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/netip"
@@ -103,6 +104,10 @@ type Server struct {
 	// MaxHeaderBytes is the maximum size to parse from a client's
 	// HTTP request headers.
 	MaxHeaderBytes int `json:"max_header_bytes,omitempty"`
+
+	// HTTP2 tunes the HTTP/2 server for this server. Zero-valued
+	// fields use the Go standard library defaults.
+	HTTP2 *HTTP2Config `json:"http2,omitempty"`
 
 	// Enable full-duplex communication for HTTP/1 requests.
 	// Only has an effect if Caddy was built with Go 1.21 or later.
@@ -305,6 +310,54 @@ var (
 	ServerHeader = "Caddy"
 	serverHeader = []string{ServerHeader}
 )
+
+// HTTP2Config configures the HTTP/2 server. Its fields mirror the
+// equivalent fields of net/http.HTTP2Config. Zero-valued fields use
+// the Go standard library defaults.
+type HTTP2Config struct {
+	// MaxConcurrentStreams is the maximum number of concurrent
+	// streams per connection that the server will accept.
+	// If zero, the default (currently 250) is used.
+	MaxConcurrentStreams int `json:"max_concurrent_streams,omitempty"`
+
+	// MaxReceiveBufferPerConnection is the size of the initial
+	// connection-level flow control window for receiving request
+	// bodies, in bytes. Must be at least 65535 if set. If zero,
+	// the default (currently 1 MiB) is used.
+	MaxReceiveBufferPerConnection int `json:"max_receive_buffer_per_connection,omitempty"`
+
+	// MaxReceiveBufferPerStream is the size of the initial
+	// stream-level flow control window for receiving request
+	// bodies, in bytes. If zero, the default (currently 1 MiB)
+	// is used.
+	MaxReceiveBufferPerStream int `json:"max_receive_buffer_per_stream,omitempty"`
+}
+
+// validate checks that configured values are within the ranges accepted
+// by the HTTP/2 server. This must reject out-of-range values because
+// golang.org/x/net/http2 silently replaces them with defaults.
+func (c *HTTP2Config) validate() error {
+	if c.MaxConcurrentStreams < 0 || int64(c.MaxConcurrentStreams) > math.MaxUint32 {
+		return fmt.Errorf("max_concurrent_streams must be in [0, %d], got %d", int64(math.MaxUint32), c.MaxConcurrentStreams)
+	}
+	if c.MaxReceiveBufferPerConnection != 0 &&
+		(c.MaxReceiveBufferPerConnection < 65535 || int64(c.MaxReceiveBufferPerConnection) > math.MaxInt32) {
+		return fmt.Errorf("max_receive_buffer_per_connection must be 0 or in [65535, %d], got %d", math.MaxInt32, c.MaxReceiveBufferPerConnection)
+	}
+	if c.MaxReceiveBufferPerStream < 0 || int64(c.MaxReceiveBufferPerStream) > math.MaxInt32 {
+		return fmt.Errorf("max_receive_buffer_per_stream must be in [0, %d], got %d", math.MaxInt32, c.MaxReceiveBufferPerStream)
+	}
+	return nil
+}
+
+// std converts the config to the standard library's equivalent type.
+func (c *HTTP2Config) std() *http.HTTP2Config {
+	return &http.HTTP2Config{
+		MaxConcurrentStreams:          c.MaxConcurrentStreams,
+		MaxReceiveBufferPerConnection: c.MaxReceiveBufferPerConnection,
+		MaxReceiveBufferPerStream:     c.MaxReceiveBufferPerStream,
+	}
+}
 
 // ServeHTTP is the entry point for all HTTP requests.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -442,6 +442,12 @@ func (app *App) Validate() error {
 				}
 			}
 		}
+
+		if srv.HTTP2 != nil {
+			if err := srv.HTTP2.validate(); err != nil {
+				return fmt.Errorf("server %s: http2: %v", srvName, err)
+			}
+		}
 	}
 	return nil
 }
@@ -508,6 +514,12 @@ func (app *App) Start() error {
 		// configure the http versions the server will serve
 		if srv.protocol("h1") {
 			srv.server.Protocols.SetHTTP1(true)
+		}
+
+		if srv.HTTP2 != nil {
+			// the HTTP/2 server reads this for both h2 and h2c connections,
+			// and it takes precedence over http2.Server fields
+			srv.server.HTTP2 = srv.HTTP2.std()
 		}
 
 		if srv.protocol("h2") || srv.protocol("h2c") {

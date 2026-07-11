@@ -17,6 +17,7 @@ package httpcaddyfile
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 
@@ -47,6 +48,7 @@ type serverOptions struct {
 	KeepAliveIdle         caddy.Duration
 	KeepAliveCount        int
 	MaxHeaderBytes        int
+	HTTP2                 *caddyhttp.HTTP2Config
 	EnableFullDuplex      bool
 	Protocols             []string
 	StrictSNIHost         *bool
@@ -211,6 +213,53 @@ func unmarshalCaddyfileServerOptions(d *caddyfile.Dispenser) (any, error) {
 				return nil, d.Errf("parsing max_header_size: %v", err)
 			}
 			serverOpts.MaxHeaderBytes = int(size)
+
+		case "http2":
+			serverOpts.HTTP2 = new(caddyhttp.HTTP2Config)
+			for nesting := d.Nesting(); d.NextBlock(nesting); {
+				switch d.Val() {
+				case "max_concurrent_streams":
+					if !d.NextArg() {
+						return nil, d.ArgErr()
+					}
+					streams, err := strconv.ParseUint(d.Val(), 10, 32)
+					if err != nil {
+						return nil, d.Errf("parsing max_concurrent_streams: %v", err)
+					}
+					serverOpts.HTTP2.MaxConcurrentStreams = int(streams)
+
+				case "max_receive_buffer_per_connection":
+					var sizeStr string
+					if !d.AllArgs(&sizeStr) {
+						return nil, d.ArgErr()
+					}
+					size, err := humanize.ParseBytes(sizeStr)
+					if err != nil {
+						return nil, d.Errf("parsing max_receive_buffer_per_connection: %v", err)
+					}
+					if size < 65535 || size > math.MaxInt32 {
+						return nil, d.Errf("max_receive_buffer_per_connection must be in [65535, %d], got %d", math.MaxInt32, size)
+					}
+					serverOpts.HTTP2.MaxReceiveBufferPerConnection = int(size)
+
+				case "max_receive_buffer_per_stream":
+					var sizeStr string
+					if !d.AllArgs(&sizeStr) {
+						return nil, d.ArgErr()
+					}
+					size, err := humanize.ParseBytes(sizeStr)
+					if err != nil {
+						return nil, d.Errf("parsing max_receive_buffer_per_stream: %v", err)
+					}
+					if size == 0 || size > math.MaxInt32 {
+						return nil, d.Errf("max_receive_buffer_per_stream must be in [1, %d], got %d", math.MaxInt32, size)
+					}
+					serverOpts.HTTP2.MaxReceiveBufferPerStream = int(size)
+
+				default:
+					return nil, d.Errf("unrecognized http2 option '%s'", d.Val())
+				}
+			}
 
 		case "enable_full_duplex":
 			if d.NextArg() {
@@ -379,6 +428,7 @@ func applyServerOptions(
 		server.KeepAliveIdle = opts.KeepAliveIdle
 		server.KeepAliveCount = opts.KeepAliveCount
 		server.MaxHeaderBytes = opts.MaxHeaderBytes
+		server.HTTP2 = opts.HTTP2
 		server.EnableFullDuplex = opts.EnableFullDuplex
 		server.Protocols = opts.Protocols
 		server.StrictSNIHost = opts.StrictSNIHost
