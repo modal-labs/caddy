@@ -237,8 +237,8 @@ func unmarshalCaddyfileServerOptions(d *caddyfile.Dispenser) (any, error) {
 					if err != nil {
 						return nil, d.Errf("parsing max_receive_buffer_per_connection: %v", err)
 					}
-					if size < 65535 || size > math.MaxInt32 {
-						return nil, d.Errf("max_receive_buffer_per_connection must be in [65535, %d], got %d", math.MaxInt32, size)
+					if size != 0 && (size < 65535 || size > math.MaxInt32) {
+						return nil, d.Errf("max_receive_buffer_per_connection must be 0 or in [65535, %d], got %d", math.MaxInt32, size)
 					}
 					serverOpts.HTTP2.MaxReceiveBufferPerConnection = int(size)
 
