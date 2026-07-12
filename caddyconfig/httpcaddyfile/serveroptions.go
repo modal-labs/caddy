@@ -226,6 +226,9 @@ func unmarshalCaddyfileServerOptions(d *caddyfile.Dispenser) (any, error) {
 					if err != nil {
 						return nil, d.Errf("parsing max_concurrent_streams: %v", err)
 					}
+					if streams > uint64(math.MaxInt) {
+						return nil, d.Errf("max_concurrent_streams must be in [0, %d], got %d", uint64(math.MaxInt), streams)
+					}
 					serverOpts.HTTP2.MaxConcurrentStreams = int(streams)
 
 				case "max_receive_buffer_per_connection":
