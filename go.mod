@@ -17,7 +17,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/cel-go v0.28.1
 	github.com/google/uuid v1.6.0
-	github.com/klauspost/compress v1.18.6
+	github.com/klauspost/compress v1.18.7
 	github.com/klauspost/cpuid/v2 v2.3.0
 	github.com/mholt/acmez/v3 v3.1.6
 	github.com/prometheus/client_golang v1.23.2
